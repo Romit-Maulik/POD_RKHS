@@ -7,10 +7,12 @@ Created on Wed Jun 10 15:07:58 2020
 
 
 import autograd.numpy as np
+np.random.seed(1)
 from autograd import value_and_grad 
 import math
+import matplotlib.pyplot as plt
 
-from kernel_functions_autograd import kernels_dic
+from kernel_functions import kernels_dic
 
 #%%
     
@@ -150,9 +152,7 @@ def grad_kernel(parameters, X_data, Y_data, sample_indices, kernel_keyword= "RBF
     rho_value, gradient = grad_K(parameters, X_data, Y_data, sample_indices, kernel_keyword, regu_lambda = regu_lambda)
     return rho_value, gradient
 
-
 #%% The class version of KF
-    
 class KernelFlowsP():
     
     def __init__(self, kernel_keyword, parameters):
@@ -292,218 +292,224 @@ class KernelFlowsP():
 
         return prediction
 
-#%%
-        
-# if __name__ == "__main__":
-#     # Generating data according to RBF kernel, true gamma is 0.1
-#     from autograd.numpy.random import uniform
-#     def data_set_RBF(dimensions, mu_correct):
-#         # a = normal(scale=0.2, size = size)
-#         values = uniform(-10, 10, dimensions)
-#         b = []
-#         for element in values:
-#             b.append( np.exp(-np.linalg.norm(element)**2 /(2*mu_correct[0]**2)))
-#         b = np.array(b) #+ normal(0, 0.25)
-#         return b, values
+def fit_data_anl3(train_data,delay,regu_lambda,noptsteps=100):
+    lenX=len(train_data[0,:])
+    num_modes = train_data.shape[0]
 
-#     mu_correct = np.array([10.0])
-#     Y, X = data_set_RBF((100, 1), mu_correct)
-#     data_set = np.concatenate((X,np.expand_dims(Y, 1)), axis = 1)
-    
-#     mu_1 = np.array([1.0])
-#     K = KernelFlowsP("RBF", mu_1)
-#     mu_pred = K.fit(X, Y, 10000, optimizer = "Nesterov",  batch_size = 50, show_it = 5000)
-#     print(mu_pred)
-    
-#     mu_2 = np.array([15.0])
-#     K = KernelFlowsP("RBF", mu_2)
-#     mu_pred = K.fit(X, Y, 10000, optimizer = "Nesterov", batch_size = 50, show_it = 5000)
-#     print(mu_pred)
+    # Some constants
+    nparameters=24
+    vdelay=delay*np.ones((num_modes,), dtype=int)
+    vregu_lambda=regu_lambda*np.ones((num_modes,))
 
+    # Get scaling factor    
+    normalize=np.amax(train_data[:,:])
 
-np.random.seed(1)
-import matplotlib.pyplot as plt
+    # Prepare training data
+    X=np.zeros((1+lenX-2*delay,delay*num_modes))
+    Y=np.zeros((1+lenX-2*delay,delay*num_modes))
+    for mode in range(train_data.shape[0]):
+        for i in range(1+lenX-2*delay):
+              X[i,(mode*delay):(mode*delay+delay)]=train_data[mode,i:(i+delay)]
+              Y[i,(mode*delay):(mode*delay+delay)]=train_data[mode,(i+delay):(i+2*delay)]
 
-# plt.close('all')
-
-train_data = np.load('../DMET/Filtered/POD_Coeffs_train.npy')
-test_data = np.load('../DMET/Filtered/POD_Coeffs_test.npy')
-
-# plt.figure()
-# plt.plot(train_data[0,:])
-# plt.plot(train_data[1,:])
-# plt.plot(train_data[2,:])
-# plt.show()
-
-# plt.figure()
-# plt.plot(test_data[0,:])
-# plt.plot(test_data[1,:])
-# plt.plot(test_data[2,:])
-# plt.show()
-
-# np.shape(train_data)
-# np.shape(test_data)
-
-# plt.figure()
-# plt.plot(train_data[0,0:30])
-# plt.show()
-
-lenX=len(train_data[0,:])
-lenXt=len(test_data[0,:])
-print(lenX,lenXt)
-
-predicted_test_data=0*test_data
-
-delay=test_data.shape[-1]//2
-
-vdelay=delay*np.ones((train_data.shape[0],), dtype=int)
-vregu_lambda=100.0*np.ones((train_data.shape[0],))
-
-# vdelay[0]=200
-# vregu_lambda[0]=100
-
-# vdelay[1]=1250
-# vregu_lambda[1]=1
-
-# vdelay[2]=1250
-# vregu_lambda[2]=1
-
-# vdelay[3]=1250
-# vregu_lambda[3]=1
-
-# vdelay[4]=1250
-# vregu_lambda[4]=1
-
-# vdelay[5]=1250
-# vregu_lambda[5]=1
-
-# vdelay[6]=1250
-# vregu_lambda[6]=1
-
-#delay=240
-
-
-# X=np.zeros((lenX-delay-1,delay))
-# for i in range(lenX-delay-1):
-#      X[i,:]=train_data[0,i:(i+delay)]
-
-
-    
-# a=np.arange(lenX+lenXt)
-# X=np.zeros((lenX-2*delay,delay))
-# Y=np.zeros((lenX-2*delay,delay))
-# for i in range(lenX-2*delay):
-#       X[i,:]=np.cos(np.pi*a[i:(i+delay)]/365)
-#       Y[i,:]=np.cos(np.pi*a[(i+delay):(i+2*delay)]/365)
-# nsteps=lenXt
-# Z=np.cos(np.pi*a/365)
-# Ztest=Z[lenX:(lenX+lenXt)]
-# Xtest=np.zeros((1,delay))
-# Xtest[0,:]=Y[i,:]
-
-
-# normalize=10000
-# train_data=train_data/normalize
-# test_data=test_data/normalize
-
-
-for mode in range(train_data.shape[0]):
-    
-    #regu_lambda=0.00000001
-    #regu_lambda=100
-    regu_lambda=vregu_lambda[mode]
-    delay=vdelay[mode]
-    
-    
-    normalize=np.amax(train_data[mode,:])
-    # print(normalize)
-    # normalize=np.mean(np.abs(train_data[mode,:]))
-    # print(normalize)
-    
-    X=np.zeros((1+lenX-2*delay,delay))
-    Y=np.zeros((1+lenX-2*delay,delay))
-    for i in range(1+lenX-2*delay):
-          X[i,:]=train_data[mode,i:(i+delay)]
-          Y[i,:]=train_data[mode,(i+delay):(i+2*delay)]
-    nsteps=lenXt      
-    Ztest=test_data[mode,:]
-    Xtest=np.zeros((1,delay))
-    Xtest[0,:]=Y[i,:]
-    
+    # Normalize
     X=X/normalize
-    Y=Y/normalize
-    Xtest=Xtest/normalize
-    Ztest=Ztest/normalize
+    Y=Y/normalize     
     
-    # import sys
-    # sys.exit()
-
-    #mu_1 = np.array([1.0])
-    mu_1 = np.array([1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0])
-    kerneltype="anl"
-    
-    K = KernelFlowsP("anl2", mu_1)
-    mu_pred = K.fit(X, Y, 100, optimizer = "Nesterov",  batch_size = 100, show_it = 500, regu_lambda=vregu_lambda[mode])
+    # Fit data
+    c=np.zeros(nparameters)+1
+    mu_1 = c
+    kerneltype="anl3"
+    K = KernelFlowsP(kerneltype, mu_1)
+    mu_pred = K.fit(X, Y, noptsteps, optimizer = "Nesterov",  batch_size = 100, show_it = 500, regu_lambda=regu_lambda)
     mu_1=mu_pred
-    
-    X_train=X
-    Y_train=Y
-    param=mu_1
+    c=mu_1
 
-    X_test=Xtest
-    
     kernel = kernels_dic[kerneltype]
-    k_matrix = kernel(X_train, X_train, param)
+    k_matrix = kernel(X, X, mu_1)
     k_matrix += regu_lambda * np.identity(k_matrix.shape[0])
-    A=np.matmul(np.linalg.inv(k_matrix), Y_train)
-    arr = np.array([])
+    A=np.matmul(np.linalg.inv(k_matrix), Y)
+
+    return k_matrix, A, mu_1, normalize, X
+
+def fit_error_model_anl3(train_data,error_data,delay,regu_lambda,noptsteps=100):
+    lenX=len(train_data[0,:])
+    num_modes = train_data.shape[0]
+
+    # Some constants
+    nparameters=24
+    vdelay=delay*np.ones((num_modes,), dtype=int)
+    vregu_lambda=regu_lambda*np.ones((num_modes,))
+
+    # Get scaling factor    
+    normalize=np.amax(train_data[:,:])
+
+    # Prepare training data
+    X=np.zeros((1+lenX-2*delay,delay*num_modes))
+    Y=np.zeros((1+lenX-2*delay,delay*num_modes))
+    for mode in range(train_data.shape[0]):
+        for i in range(1+lenX-2*delay):
+              X[i,(mode*delay):(mode*delay+delay)]=train_data[mode,i:(i+delay)]
+              Y[i,(mode*delay):(mode*delay+delay)]=error_data[mode,(i+delay):(i+2*delay)]
+
+    # Normalize
+    X=X/normalize
+    Y=Y/normalize     
     
+    # Fit data
+    c=np.zeros(nparameters)+1
+    mu_1 = c
+    kerneltype="anl3"
+    K = KernelFlowsP(kerneltype, mu_1)
+    mu_pred = K.fit(X, Y, noptsteps, optimizer = "Nesterov",  batch_size = 100, show_it = 500, regu_lambda=regu_lambda)
+    mu_1=mu_pred
+    c=mu_1
+
+    kernel = kernels_dic[kerneltype]
+    k_matrix = kernel(X, X, mu_1)
+    k_matrix += regu_lambda * np.identity(k_matrix.shape[0])
+    A=np.matmul(np.linalg.inv(k_matrix), Y)
+
+    return k_matrix, A, mu_1, normalize, X
+
+def test_fit_anl3(test_data,train_X,delay,k_matrix,A,param,normalize):
+    lenXt=len(test_data[0,:])
+    num_modes = test_data.shape[0]
+
+    nsteps=lenXt
+    X_test=np.zeros((1,delay*num_modes))
+    X_test[0,:] = test_data[:,:delay].reshape(1,-1)
+    X_test=X_test/normalize
+    
+    arr = np.zeros((nsteps,num_modes))
+    arr[:2*delay,:] = train_data[:,:2*delay].T/normalize
+
+    kerneltype = "anl3"
+    kernel = kernels_dic[kerneltype]
+
     X_test0=X_test
     isteps=int(nsteps/delay)+1
-    for i in range(isteps):
+    for i in range(1,isteps):
         X_test1=X_test0
-        t_matrix = kernel(X_test1, X_train, param) 
+        t_matrix = kernel(X_test1, train_X, param) 
         prediction = np.matmul(t_matrix, A) 
-        X_test0=prediction
-        arr = np.append(arr, np.array(prediction[0,:]))
-    arr=arr[0:nsteps]
         
-    pred=arr*normalize
-    Ztest=Ztest*normalize
-    
-    plt.figure()
-    line_up, =plt.plot(pred,label='predicted')
-    line_down, =plt.plot(Ztest,label='true')
-    plt.legend(handles=[line_up, line_down])
-    plt.title("mode "+str(mode))
-    plt.show()
-    
-    predicted_test_data[mode,:]=pred
-    
-    nmin=0
-    nmax=400
-    plt.figure()
-    line_up, =plt.plot(pred[nmin:nmax],label='predicted')
-    line_down, =plt.plot(Ztest[nmin:nmax],label='true')
-    plt.legend(handles=[line_up, line_down])
-    plt.title("mode "+str(mode)+", tmin="+str(nmin)+", tmax="+str(nmax))
-    plt.show()
-    
-    nmin=1200
-    nmax=1600
-    plt.figure()
-    line_up, =plt.plot(pred[nmin:nmax],label='predicted')
-    line_down, =plt.plot(Ztest[nmin:nmax],label='true')
-    plt.legend(handles=[line_up, line_down])
-    plt.title("mode "+str(mode)+", tmin="+str(nmin)+", tmax="+str(nmax))
-    plt.show()
-    
-    
-    
-    # t=kernel(X_train, X_train, param)
-    # prediction = np.matmul(t, A)
-    # plt.figure()
-    # plt.plot(prediction)
-    # plt.show()
+        # Just using true data
+        X_test0 = (test_data[:,i*delay:(i+1)*delay]/normalize).reshape(1,-1)
 
-np.save("predicted_test_data",predicted_test_data)
+        # # Feedback
+        # X_test0=prediction
+        
+        for mode in range(num_modes):
+            imin=i*delay
+            imax=np.minimum((i+1)*delay,nsteps)
+            delaymin=imax-imin
+            arr[imin:imax,mode]=np.array(prediction[0,(mode*delay):(mode*delay+delaymin)])
+
+    # Rescale
+    predall=arr*normalize
+
+    return predall.T
+
+def test_error_model_anl3(test_data,train_X,delay,k_matrix,A,param,normalize):
+    lenXt=len(test_data[0,:])
+    num_modes = test_data.shape[0]
+
+    nsteps=lenXt
+    X_test=np.zeros((1,delay*num_modes))
+    X_test[0,:] = test_data[:,:delay].reshape(1,-1)
+    X_test=X_test/normalize
+    
+    arr = np.zeros((nsteps,num_modes))
+    arr[:2*delay,:] = train_data[:,:2*delay].T/normalize
+
+    kerneltype = "anl3"
+    kernel = kernels_dic[kerneltype]
+
+    X_test0=X_test
+    isteps=int(nsteps/delay)+1
+    for i in range(1,isteps):
+        X_test1=X_test0
+        t_matrix = kernel(X_test1, train_X, param) 
+        prediction = np.matmul(t_matrix, A) 
+        
+        # Just using true data
+        X_test0 = (test_data[:,i*delay:(i+1)*delay]/normalize).reshape(1,-1)
+
+        # # Feedback
+        # X_test0=prediction
+        
+        for mode in range(num_modes):
+            imin=i*delay
+            imax=np.minimum((i+1)*delay,nsteps)
+            delaymin=imax-imin
+            arr[imin:imax,mode]=np.array(prediction[0,(mode*delay):(mode*delay+delaymin)])
+
+    # Rescale
+    predall=arr*normalize
+
+    return predall.T
+
+
+
+if __name__ == '__main__':
+    train_data = np.load('../DMET/Filtered/POD_Coeffs_train.npy')
+    test_data = np.load('../DMET/Filtered/POD_Coeffs_test.npy')
+
+    # Set delay
+    delay = 14
+    regu_lambda = 100
+    noptsteps = 500
+
+    # Fit on training data
+    k_matrix, A, param, normalize, train_X = fit_data_anl3(train_data,delay,regu_lambda,noptsteps)
+
+    # Predict and get error on training data
+    predicted_train = test_fit_anl3(train_data, train_X, delay, k_matrix, A, param, normalize)
+
+    np.save('RKHS_Train_Prediction.npy',predicted_train)
+    train_error = np.abs(predicted_train-train_data)
+    np.save('RKHS_Train_Error.npy',train_error)
+
+    # Predict testing data
+    predicted_test = test_fit_anl3(test_data, train_X, delay, k_matrix, A, param, normalize)
+    np.save('RKHS_Test_Prediction.npy',predicted_test)
+    test_error = np.abs(predicted_test-test_data)
+    np.save('RKHS_Test_Error.npy',train_error)
+
+    # Visualize the modal predictions
+    for mode_num in range(3):
+        fig, ax = plt.subplots(nrows=1,ncols=2)
+        ax[0].plot(predicted_test[mode_num,:],label='Test predicted')
+        ax[0].plot(test_data[mode_num,:],label='Test true')
+        ax[0].legend()
+
+        ax[1].plot(predicted_train[mode_num,:],label='Train predicted')
+        ax[1].plot(train_data[mode_num,:],label='Train true')
+        ax[1].legend()
+        plt.tight_layout()
+        plt.show()
+
+    # Fit an error model
+    k_matrix_err, A_err, param_err, normalize_err, train_X_err = fit_error_model_anl3(train_data,train_error,delay,regu_lambda,noptsteps)
+
+    # Predict the error on train data
+    predicted_train_error = test_error_model_anl3(train_data, train_X_err, 
+                                        delay, k_matrix_err, A_err, param_err, normalize_err)
+
+    # Predict the error on test data
+    predicted_test_error = test_error_model_anl3(test_data, train_X_err, 
+                                        delay, k_matrix_err, A_err, param_err, normalize_err)
+
+    # Visualize the error predictions for 1 mode
+    for mode_num in range(3):
+        fig, ax = plt.subplots(nrows=1,ncols=2)
+        ax[0].plot(predicted_test_error[mode_num,:],label='Test predicted error')
+        ax[0].plot(test_error[mode_num,:],label='Test true error')
+        ax[0].legend()
+
+        ax[1].plot(predicted_train_error[mode_num,:],label='Train predicted error')
+        ax[1].plot(train_error[mode_num,:],label='Train true error')
+        ax[1].legend()
+        plt.tight_layout()
+        plt.show()
