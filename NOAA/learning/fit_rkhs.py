@@ -453,16 +453,21 @@ def test_error_model_anl3(test_data,train_X,delay,k_matrix,A,param,normalize):
 
 
 if __name__ == '__main__':
+    from time import time
     train_data = np.load('../True_Train.npy')
     test_data = np.load('../True_Test.npy')
 
     # Set delay
     delay = 8
-    regu_lambda = 10.0
+    regu_lambda = 15.0
     noptsteps = 1000
 
     # Fit on training data
+    start_time = time()
     k_matrix, A, param, normalize, train_X = fit_data_anl3(train_data,delay,regu_lambda,noptsteps)
+    end_time = time()
+
+    print('Time taken for fit:',end_time-start_time)
 
     # Predict and get error on training data
     predicted_train = test_fit_anl3(train_data, train_X, delay, k_matrix, A, param, normalize)
